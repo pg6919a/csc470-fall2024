@@ -18,41 +18,39 @@ public class GameManager : MonoBehaviour
 
     public List<UnitScript> units = new List<UnitScript>();
 
-    // Text panels for each interactive object
     public GameObject chestTextPanel;
     public GameObject barrelTextPanel;
     public GameObject notebookTextPanel;
     public GameObject bookshelfTextPanel;
 
-    // Slider for handle movement
     public Slider handleSlider;
 
-    // HashSet to track clicked objects
     private HashSet<string> clickedObjects;
 
-    // Total number of interactive objects
     private int totalInteractableObjects;
 
-    // Proximity range
     public float interactionRange = 5f;
 
-    // Door input panel and winner panel
     public GameObject doorInputPanel;
     public GameObject winnerPanel;
+    public GameObject gameOverPanel;
 
-    // Door input field
     public TMP_InputField doorInputField;
 
-    // Distance message
     public TMP_Text distanceMessage;
+    public TMP_Text livesText;
 
+    private int lives = 3;
     LayerMask layerMask;
 
-    void OnEnable() 
+    void OnEnable()
     {
-        if (GameManager.instance == null) {
+        if (GameManager.instance == null)
+        {
             GameManager.instance = this;
-        } else {
+        }
+        else
+        {
             Destroy(this);
         }
     }
@@ -61,23 +59,22 @@ public class GameManager : MonoBehaviour
     {
         layerMask = LayerMask.GetMask("ground", "unit", "Interactable");
 
-        // Ensure all panels are initially inactive
         chestTextPanel.SetActive(false);
         barrelTextPanel.SetActive(false);
         notebookTextPanel.SetActive(false);
         bookshelfTextPanel.SetActive(false);
         doorInputPanel.SetActive(false);
         winnerPanel.SetActive(false);
+        gameOverPanel.SetActive(false);
 
-        // Initialize the HashSet to track clicked objects
         clickedObjects = new HashSet<string>();
 
-        // Set the slider's maximum value to the total number of interactive objects
-        totalInteractableObjects = 4; // Example: chest, barrel, notebook, bookshelf
-        handleSlider.maxValue = totalInteractableObjects;
+        totalInteractableObjects = 4;
+        handleSlider.maxValue = totalInteractableObjects * 40;
         handleSlider.value = 0;
 
-        // Hide the distance message at start
+        livesText.text = $"Lives: {lives}";
+
         if (distanceMessage != null)
         {
             distanceMessage.gameObject.SetActive(false);
@@ -86,22 +83,30 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Space)) {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
             SpacebarPressed?.Invoke();
         }
 
-        if (Input.GetMouseButtonDown(0)) {
+        if (Input.GetMouseButtonDown(0))
+        {
             Ray mousePositionRay = mainCamera.ScreenPointToRay(Input.mousePosition);
             RaycastHit hitInfo;
-            if (Physics.Raycast(mousePositionRay, out hitInfo, Mathf.Infinity, layerMask)) 
+            if (Physics.Raycast(mousePositionRay, out hitInfo, Mathf.Infinity, layerMask))
             {
-                if (hitInfo.collider.CompareTag("ground")) {
-                    if (selectedUnit != null) {
+                if (hitInfo.collider.CompareTag("ground"))
+                {
+                    if (selectedUnit != null)
+                    {
                         selectedUnit.nma.SetDestination(hitInfo.point);
                     }
-                } else if (hitInfo.collider.CompareTag("unit")) {
+                }
+                else if (hitInfo.collider.CompareTag("unit"))
+                {
                     SelectUnit(hitInfo.collider.gameObject.GetComponent<UnitScript>());
-                } else {
+                }
+                else
+                {
                     HandleObjectClick(hitInfo.collider);
                 }
             }
@@ -110,11 +115,9 @@ public class GameManager : MonoBehaviour
 
     void HandleObjectClick(Collider clickedObject)
     {
-        // Check if the unit is within interaction range
         float distanceToUnit = Vector3.Distance(selectedUnit.transform.position, clickedObject.transform.position);
         if (distanceToUnit > interactionRange)
         {
-            // Show the distance message if not close enough
             if (distanceMessage != null)
             {
                 StartCoroutine(DisplayDistanceMessage("You are not close enough to the object!"));
@@ -122,56 +125,74 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Hide all panels before showing the correct one
         chestTextPanel.SetActive(false);
         barrelTextPanel.SetActive(false);
         notebookTextPanel.SetActive(false);
         bookshelfTextPanel.SetActive(false);
 
-        // Show the relevant panel based on the clicked object's tag
-        if (clickedObject.CompareTag("Chest")) {
+        if (clickedObject.CompareTag("Chest"))
+        {
             chestTextPanel.SetActive(true);
-        } else if (clickedObject.CompareTag("Barrel")) {
+        }
+        else if (clickedObject.CompareTag("Barrel"))
+        {
             barrelTextPanel.SetActive(true);
-        } else if (clickedObject.CompareTag("Notebook")) {
+        }
+        else if (clickedObject.CompareTag("Notebook"))
+        {
             notebookTextPanel.SetActive(true);
-        } else if (clickedObject.CompareTag("Bookshelf")) {
+        }
+        else if (clickedObject.CompareTag("Bookshelf"))
+        {
             bookshelfTextPanel.SetActive(true);
-        } else if (clickedObject.CompareTag("Door")) {
-            doorInputPanel.SetActive(true); // Show the door input panel when the player clicks the door
+        }
+        else if (clickedObject.CompareTag("Door"))
+        {
+            doorInputPanel.SetActive(true);
+            handleSlider.value = handleSlider.maxValue;
+            return;
         }
 
-        // Get the object name
         string objectName = clickedObject.gameObject.name;
 
-        // Increment progress only if the object hasn't been clicked before
-        if (!clickedObjects.Contains(objectName))
+        if (clickedObjects.Contains(objectName))
+        {
+            handleSlider.value -= 40;
+            clickedObjects.Remove(objectName);
+        }
+        else
         {
             clickedObjects.Add(objectName);
-            handleSlider.value = clickedObjects.Count; // Update slider value
+            handleSlider.value += 40;
         }
     }
 
     IEnumerator DisplayDistanceMessage(string message)
     {
-        // Display the message
         distanceMessage.text = message;
         distanceMessage.gameObject.SetActive(true);
-
-        // Wait for 2 seconds
         yield return new WaitForSeconds(2f);
-
-        // Hide the message
         distanceMessage.gameObject.SetActive(false);
     }
 
     public void SubmitDoorCode()
     {
-        // Check if the entered code is "777"
         if (doorInputField.text == "710")
         {
-            doorInputPanel.SetActive(false); // Close the door input panel
-            winnerPanel.SetActive(true); // Show the winner panel
+            doorInputPanel.SetActive(false);
+            winnerPanel.SetActive(true);
+        }
+        else
+        {
+            lives -= 1;
+            livesText.text = $"Lives: {lives}";
+
+            if (lives <= 0)
+            {
+                gameOverPanel.SetActive(true);
+                gameOverPanel.GetComponentInChildren<TMP_Text>().text = "YOU DIED";
+                doorInputPanel.SetActive(false);
+            }
         }
     }
 
@@ -183,16 +204,15 @@ public class GameManager : MonoBehaviour
 
     public void CloseAllTextPanels()
     {
-        // Method to close all text panels, can be used by UI buttons
         chestTextPanel.SetActive(false);
         barrelTextPanel.SetActive(false);
         notebookTextPanel.SetActive(false);
         bookshelfTextPanel.SetActive(false);
+        doorInputPanel.SetActive(false);
     }
 
     public void RestartGame()
     {
-        // Reload the currently active scene to restart the game
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 }
